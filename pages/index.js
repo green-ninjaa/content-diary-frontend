@@ -76,7 +76,7 @@ const ContentDiary = () => {
         case "tv":
           apiUrl = `https://imdb-com.p.rapidapi.com/search?searchTerm=${encodeURIComponent(search)}`;
           headers = {
-            'x-rapidapi-host': 'imdb-com.p.rapidapi.com',
+            'x-rapidapi-host': 'imdb-movies-web-series-etc-search.p.rapidapi.com',
             'x-rapidapi-key': RAPIDAPI_KEY,
           };
           break;
