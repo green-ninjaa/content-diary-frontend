@@ -1,127 +1,272 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 
 const BACKEND_URL = typeof window !== 'undefined' 
-  ? window.ENV_BACKEND_URL || 'https://your-railway-app.railway.app'
-  : 'https://your-railway-app.railway.app';
+  ? window.ENV_BACKEND_URL || 'https://your-backend-url.com'
+  : 'https://your-backend-url.com';
 
 const RAPIDAPI_KEY = typeof window !== 'undefined'
   ? window.ENV_RAPIDAPI_KEY || ''
   : '';
 
-const MovieDiary = () => {
+const ContentDiary = () => {
   const [search, setSearch] = useState("");
-  const [movies, setMovies] = useState([]);
+  const [content, setContent] = useState([]);
+  const [contentType, setContentType] = useState("movie");
   const [loading, setLoading] = useState(false);
-  const [watchedMovies, setWatchedMovies] = useState([]);
-  const [showWatchlist, setShowWatchlist] = useState(false);
+  const [watchedContent, setWatchedContent] = useState([]);
+  const [stashItems, setStashItems] = useState([]);
+  const [activeSection, setActiveSection] = useState("search");
+  const [stashForm, setStashForm] = useState({
+    title: "",
+    description: "",
+    type: "link",
+    url: "",
+    file: null
+  });
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetchWatchedMovies();
-  }, []);
+    fetchWatchedContent();
+    fetchStashItems();
+  }, [contentType]);
 
-  const fetchWatchedMovies = async () => {
+  const fetchWatchedContent = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/movies`);
-      if (!response.ok) throw new Error('Failed to fetch watched movies');
+      const response = await fetch(`${BACKEND_URL}/api/content?type=${contentType}`);
+      if (!response.ok) throw new Error('Failed to fetch watched content');
       const data = await response.json();
-      setWatchedMovies(data);
+      setWatchedContent(data);
     } catch (error) {
-      setError("Failed to fetch your watchlist. Please try again later.");
-      console.error("Error fetching watchlist:", error);
+      setError(`Failed to fetch ${contentType} watchlist`);
+      console.error(`Error fetching ${contentType} watchlist:`, error);
     }
   };
 
-  const fetchMovies = async () => {
+  const fetchStashItems = async () => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/stash`);
+      if (!response.ok) throw new Error('Failed to fetch stash items');
+      const data = await response.json();
+      setStashItems(data);
+    } catch (error) {
+      setError("Failed to fetch stash items");
+      console.error("Error fetching stash items:", error);
+    }
+  };
+
+  const fetchContent = async () => {
     if (!search.trim()) return;
     setLoading(true);
     setError("");
 
     try {
-      const response = await fetch(`https://imdb-com.p.rapidapi.com/search?searchTerm=${encodeURIComponent(search)}`, {
-        method: 'GET',
-        headers: {
-          'x-rapidapi-host': 'imdb-com.p.rapidapi.com',
-          'x-rapidapi-key': RAPIDAPI_KEY,
-        },
-      });
+      let apiUrl = "";
+      let headers = {};
 
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
+      // Different API endpoints based on content type
+      switch (contentType) {
+        case "movie":
+          apiUrl = `https://imdb-com.p.rapidapi.com/search?searchTerm=${encodeURIComponent(search)}`;
+          headers = {
+            'x-rapidapi-host': 'imdb-com.p.rapidapi.com',
+            'x-rapidapi-key': RAPIDAPI_KEY,
+          };
+          break;
+        case "tv":
+          apiUrl = `https://imdb-com.p.rapidapi.com/search?searchTerm=${encodeURIComponent(search)}`;
+          headers = {
+            'x-rapidapi-host': 'imdb-com.p.rapidapi.com',
+            'x-rapidapi-key': RAPIDAPI_KEY,
+          };
+          break;
+        case "anime":
+          apiUrl = `https://myanimelist.p.rapidapi.com/anime/search/${encodeURIComponent(search)}`;
+          headers = {
+            'x-rapidapi-host': 'myanimelist.p.rapidapi.com',
+            'x-rapidapi-key': RAPIDAPI_KEY,
+          };
+          break;
       }
+
+      const response = await fetch(apiUrl, { method: 'GET', headers });
+      
+      if (!response.ok) throw new Error('Network response was not ok');
 
       const data = await response.json();
+      let formattedContent = [];
 
-      if (data?.data?.mainSearch?.edges) {
-        const formattedMovies = data.data.mainSearch.edges
-          .map((item) => {
-            const entity = item.node?.entity;
-            return {
-              id: entity?.id || "N/A",
-              title: entity?.titleText?.originalTitleText?.text || entity?.titleText?.text || "Unknown Title",
-              image: entity?.primaryImage?.url || "",
-              year: entity?.releaseYear?.year || "N/A",
-            };
-          })
-          .filter((movie) => movie.image !== "");
-
-        setMovies(formattedMovies);
-      } else {
-        setMovies([]);
+      switch (contentType) {
+        case "movie":
+        case "tv":
+          formattedContent = (data.data?.mainSearch?.edges || [])
+            .map((item) => {
+              const entity = item.node?.entity;
+              return {
+                id: entity?.id || "N/A",
+                title: entity?.titleText?.originalTitleText?.text || entity?.titleText?.text || "Unknown Title",
+                image: entity?.primaryImage?.url || "",
+                year: entity?.releaseYear?.year || "N/A",
+                type: contentType
+              };
+            })
+            .filter((item) => item.image !== "");
+          break;
+        case "anime":
+          formattedContent = (data || [])
+            .map((anime) => ({
+              id: anime.mal_id.toString(),
+              title: anime.title,
+              image: anime.images?.jpg?.image_url || "",
+              year: anime.aired?.from ? new Date(anime.aired.from).getFullYear() : "N/A",
+              type: "anime"
+            }));
+          break;
       }
+
+      setContent(formattedContent);
     } catch (error) {
-      setError("Failed to fetch movies. Please try again later.");
-      console.error("Error fetching movies:", error);
+      setError(`Failed to fetch ${contentType}. Please try again later.`);
+      console.error(`Error fetching ${contentType}:`, error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddToWatched = async (movie) => {
+  const handleAddToWatched = async (item) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/movies`, {
+      const response = await fetch(`${BACKEND_URL}/api/content`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...movie,
+          ...item,
           dateAdded: new Date().toISOString()
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to add movie');
+      if (!response.ok) throw new Error('Failed to add content');
       
-      const savedMovie = await response.json();
-      setWatchedMovies([...watchedMovies, savedMovie]);
+      const savedItem = await response.json();
+      setWatchedContent([...watchedContent, savedItem]);
     } catch (error) {
-      setError("Failed to add movie to watchlist. Please try again later.");
-      console.error("Error adding movie:", error);
+      setError(`Failed to add ${contentType} to watchlist`);
+      console.error(`Error adding ${contentType}:`, error);
     }
   };
 
-  const handleRemoveFromWatched = async (movie) => {
+  const handleRemoveFromWatched = async (item) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/movies/${movie.id}`, {
+      const response = await fetch(`${BACKEND_URL}/api/content/${item.id}`, {
         method: 'DELETE',
       });
 
-      if (!response.ok) throw new Error('Failed to remove movie');
+      if (!response.ok) throw new Error('Failed to remove content');
       
-      setWatchedMovies(watchedMovies.filter((m) => m.id !== movie.id));
+      setWatchedContent(watchedContent.filter((m) => m.id !== item.id));
     } catch (error) {
-      setError("Failed to remove movie from watchlist. Please try again later.");
-      console.error("Error removing movie:", error);
+      setError(`Failed to remove ${contentType} from watchlist`);
+      console.error(`Error removing ${contentType}:`, error);
     }
   };
 
-  const MovieCard = ({ movie, isWatched, onAction }) => (
+  const handleStashFormSubmit = async (e) => {
+    e.preventDefault();
+    const formData = new FormData();
+    
+    formData.append('title', stashForm.title);
+    formData.append('description', stashForm.description);
+    
+    if (stashForm.file) {
+      formData.append('file', stashForm.file);
+      formData.append('type', 'file');
+    } else {
+      formData.append('type', stashForm.type);
+      formData.append('url', stashForm.url);
+    }
+
+    try {
+      const response = await axios.post(`${BACKEND_URL}/api/stash`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      setStashItems([response.data, ...stashItems]);
+      // Reset form
+      setStashForm({
+        title: "",
+        description: "",
+        type: "link",
+        url: "",
+        file: null
+      });
+    } catch (error) {
+      setError("Failed to add stash item");
+      console.error("Error adding stash item:", error);
+    }
+  };
+
+  const handleRemoveStashItem = async (id) => {
+    try {
+      await fetch(`${BACKEND_URL}/api/stash/${id}`, {
+        method: 'DELETE',
+      });
+      
+      setStashItems(stashItems.filter((item) => item._id !== id));
+    } catch (error) {
+      setError("Failed to remove stash item");
+      console.error("Error removing stash item:", error);
+    }
+  };
+
+  const renderStashItems = () => {
+    return stashItems.map((item) => (
+      <div 
+        key={item._id} 
+        className="bg-gray-800 p-4 rounded-lg flex justify-between items-center"
+      >
+        <div>
+          <h3 className="font-bold">{item.title}</h3>
+          <p className="text-sm text-gray-400">{item.type}</p>
+          {item.type === 'file' ? (
+            <a 
+              href={`${BACKEND_URL}${item.url}`} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-blue-400 hover:underline"
+            >
+              View File
+            </a>
+          ) : (
+            <a 
+              href={item.url} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-blue-400 hover:underline truncate block max-w-xs"
+            >
+              {item.url}
+            </a>
+          )}
+        </div>
+        <button 
+          onClick={() => handleRemoveStashItem(item._id)}
+          className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+        >
+          Remove
+        </button>
+      </div>
+    ));
+  };
+
+  const ContentCard = ({ content, isWatched, onAction }) => (
     <div className="bg-gray-800 p-4 rounded-lg shadow-lg flex flex-col items-center transform transition-all duration-300 hover:scale-105 hover:shadow-xl">
       <div className="relative w-40 h-56 overflow-hidden rounded-lg border border-gray-700">
-        {movie.image ? (
+        {content.image ? (
           <img
-            src={movie.image}
-            alt={movie.title}
+            src={content.image}
+            alt={content.title}
             className="w-full h-full object-cover transition-transform duration-300 hover:scale-110"
           />
         ) : (
@@ -130,15 +275,10 @@ const MovieDiary = () => {
           </div>
         )}
       </div>
-      <h2 className="text-lg mt-3 text-center font-semibold line-clamp-2">{movie.title}</h2>
-      <p className="text-sm text-gray-400 mt-1">{movie.year}</p>
-      {isWatched && (
-        <p className="text-xs text-gray-400 mt-1">
-          Added: {new Date(movie.dateAdded).toLocaleDateString()}
-        </p>
-      )}
+      <h2 className="text-lg mt-3 text-center font-semibold line-clamp-2">{content.title}</h2>
+      <p className="text-sm text-gray-400 mt-1">{content.year}</p>
       <button
-        onClick={() => onAction(movie)}
+        onClick={() => onAction(content)}
         className={`mt-3 px-4 py-2 text-sm rounded-lg font-medium transition-all duration-300 ${
           isWatched
             ? "bg-red-600 hover:bg-red-700 text-white flex items-center gap-2"
@@ -155,92 +295,198 @@ const MovieDiary = () => {
       <div className="w-full max-w-6xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-5xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
-            My Watch Diary
+            Content Diary
           </h1>
-          <p className="text-gray-400">Keep track of your movie watching journey</p>
+          <p className="text-gray-400">Track your movies, TV shows, and anime</p>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-4 mb-8">
-          <div className="flex-1 flex space-x-2">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && fetchMovies()}
-                placeholder="Search movies..."
-                className="w-full p-3 pl-10 rounded-lg bg-gray-800 border border-gray-600 text-white transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <span className="absolute left-3 top-3.5 text-gray-400">🔍</span>
-            </div>
+        <div className="flex space-x-4 mb-6 justify-center">
+          {["movie", "tv", "anime"].map((type) => (
             <button
-              onClick={fetchMovies}
-              disabled={loading}
-              className="px-6 py-3 bg-blue-600 rounded-lg text-white hover:bg-blue-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              key={type}
+              onClick={() => {
+                setContentType(type);
+                setActiveSection("search");
+              }}
+              className={`px-4 py-2 rounded-lg capitalize ${
+                contentType === type 
+                  ? "bg-blue-600 text-white" 
+                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+              }`}
             >
-              {loading ? "Loading..." : "Search"}
+              {type}
             </button>
-          </div>
+          ))}
           <button
-            onClick={() => setShowWatchlist(!showWatchlist)}
-            className={`px-6 py-3 rounded-lg transition-all duration-300 flex items-center gap-2 ${
-              showWatchlist
-                ? "bg-purple-600 hover:bg-purple-700"
-                : "bg-gray-700 hover:bg-gray-600"
+            onClick={() => setActiveSection("stash")}
+            className={`px-4 py-2 rounded-lg ${
+              activeSection === "stash"
+                ? "bg-purple-600 text-white"
+                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
             }`}
           >
-            {showWatchlist ? "Show Search" : "Show Watchlist"}
+            Stash
           </button>
         </div>
 
-        {error && (
-          <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-6">
-            {error}
-          </div>
-        )}
-
-        {showWatchlist ? (
+        {activeSection === "search" ? (
           <>
-            <h2 className="text-2xl font-bold mb-6 text-purple-400">
-              My Watchlist ({watchedMovies.length})
-            </h2>
+            <div className="flex flex-col md:flex-row gap-4 mb-8">
+              <div className="flex-1 flex space-x-2">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && fetchContent()}
+                    placeholder={`Search ${contentType}s...`}
+                    className="w-full p-3 pl-10 rounded-lg bg-gray-800 border border-gray-600 text-white transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <span className="absolute left-3 top-3.5 text-gray-400">🔍</span>
+                </div>
+                <button
+                  onClick={fetchContent}
+                  disabled={loading}
+                  className="px-6 py-3 bg-blue-600 rounded-lg text-white hover:bg-blue-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {loading ? "Loading..." : "Search"}
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {watchedMovies.length === 0 ? (
+              {loading ? (
+                <div className="col-span-full text-center py-12">
+                  <div className="text-gray-400">Searching...</div>
+                </div>
+              ) : content.length === 0 ? (
                 <div className="col-span-full text-center text-gray-400 py-12">
-                  Your watchlist is empty. Start adding some movies!
+                  {search.trim() ? `No ${contentType}s found.` : `Start searching for ${contentType}s!`}
                 </div>
               ) : (
-                watchedMovies.map((movie) => (
-                  <MovieCard
-                    key={movie.id}
-                    movie={movie}
-                    isWatched={true}
-                    onAction={handleRemoveFromWatched}
+                content.map((item) => (
+                  <ContentCard
+                    key={item.id}
+                    content={item}
+                    isWatched={watchedContent.some((m) => m.id === item.id)}
+                    onAction={handleAddToWatched}
                   />
                 ))
               )}
             </div>
           </>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {loading ? (
-              <div className="col-span-full text-center py-12">
-                <div className="text-gray-400">Searching for movies...</div>
+          <div className="space-y-6">
+            <form 
+              onSubmit={handleStashFormSubmit} 
+              className="bg-gray-800 p-6 rounded-lg space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Stash Type
+                </label>
+                <select
+                  value={stashForm.type}
+                  onChange={(e) => setStashForm({...stashForm, type: e.target.value})}
+                  className="w-full p-2 bg-gray-700 rounded-lg border border-gray-600 text-white"
+                >
+                  <option value="link">Link</option>
+                  <option value="image">Image URL</option>
+                  <option value="file">File Upload</option>
+                </select>
               </div>
-            ) : movies.length === 0 ? (
-              <div className="col-span-full text-center text-gray-400 py-12">
-                {search.trim() ? "No movies found." : "Start searching for movies!"}
-              </div>
-            ) : (
-              movies.map((movie) => (
-                <MovieCard
-                  key={movie.id}
-                  movie={movie}
-                  isWatched={watchedMovies.some((m) => m.id === movie.id)}
-                  onAction={handleAddToWatched}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={stashForm.title}
+                  onChange={(e) => setStashForm({...stashForm, title: e.target.value})}
+                  required
+                  className="w-full p-2 bg-gray-700 rounded-lg border border-gray-600 text-white"
+                  placeholder="Enter a title for your stash item"
                 />
-              ))
-            )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Description (Optional)
+                </label>
+                <textarea
+                  value={stashForm.description}
+                  onChange={(e) => setStashForm({...stashForm, description: e.target.value})}
+                  className="w-full p-2 bg-gray-700 rounded-lg border border-gray-600 text-white"
+                  placeholder="Add a description"
+                  rows="3"
+                />
+              </div>
+
+              {stashForm.type !== 'file' ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    {stashForm.type === 'link' ? 'URL' : 'Image URL'}
+                  </label>
+                  <input
+                    type="url"
+                    value={stashForm.url}
+                    onChange={(e) => setStashForm({...stashForm, url: e.target.value})}
+                    required
+                    className="w-full p-2 bg-gray-700 rounded-lg border border-gray-600 text-white"
+                    placeholder={stashForm.type === 'link' 
+                      ? "https://example.com" 
+                      : "https://example.com/image.jpg"}
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    File Upload
+                  </label>
+                  <input
+                    type="file"
+                    onChange={(e) => setStashForm({...stashForm, file: e.target.files[0]})}
+                    required
+                    className="w-full p-2 bg-gray-700 rounded-lg border border-gray-600 text-white"
+                  />
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Add to Stash
+              </button>
+            </form>
+
+            <div className="space-y-4">
+              <h2 className="text-2xl font-bold text-purple-400">
+                My Stash ({stashItems.length})
+              </h2>
+              {stashItems.length === 0 ? (
+                <div className="text-center text-gray-400 py-12">
+                  Your stash is empty. Start adding some items!
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {renderStashItems()}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-900/80 border border-red-500 text-red-200 px-6 py-3 rounded-lg z-50">
+            {error}
+            <button 
+              onClick={() => setError("")}
+              className="ml-4 text-red-300 hover:text-red-100"
+            >
+              ✕
+            </button>
           </div>
         )}
       </div>
@@ -248,4 +494,4 @@ const MovieDiary = () => {
   );
 };
 
-export default MovieDiary;
+export default ContentDiary;
