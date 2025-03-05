@@ -76,7 +76,7 @@ const ContentDiary = () => {
         case "tv":
           apiUrl = `https://imdb-com.p.rapidapi.com/search?searchTerm=${encodeURIComponent(search)}`;
           headers = {
-            'x-rapidapi-host': 'imdb-movies-web-series-etc-search.p.rapidapi.com',
+            'x-rapidapi-host': 'imdb-com.p.rapidapi.com',
             'x-rapidapi-key': RAPIDAPI_KEY,
           };
           break;
@@ -327,19 +327,7 @@ const ContentDiary = () => {
           >
             Stash
           </button>
-              // Add this inside the return statement, near the other buttons
-          <button
-            onClick={() => setActiveSection(activeSection === "watchlist" ? "search" : "watchlist")
-            className={px-4 py-2 rounded-lg ${
-              activeSection === "watchlist"
-                ? "bg-green-600 text-white"
-                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-             }}
-           >
-             Watchlist
-           </button>
-          
-      </div>
+        </div>
 
         {activeSection === "search" ? (
           <>
