@@ -328,20 +328,18 @@ const ContentDiary = () => {
             Stash
           </button>
               // Add this inside the return statement, near the other buttons
-<button
-  onClick={() => {
-    setActiveSection(activeSection === "watchlist" ? "search" : "watchlist");
-  }}
-  className={px-4 py-2 rounded-lg ${
-    activeSection === "watchlist"
-      ? "bg-green-600 text-white"
-      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-  }}
->
-  Watchlist
-</button>
+          <button
+            onClick={() => setActiveSection(activeSection === "watchlist" ? "search" : "watchlist")
+            className={px-4 py-2 rounded-lg ${
+              activeSection === "watchlist"
+                ? "bg-green-600 text-white"
+                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+             }}
+           >
+             Watchlist
+           </button>
           
-        </div>
+      </div>
 
         {activeSection === "search" ? (
           <>
