@@ -178,7 +178,35 @@ const ContentDiary = () => {
     }
   };
 
-  // Existing methods remain the same...
+  const ContentCard = ({ content, isWatched, onAction }) => (
+    <div className="bg-gray-800 p-4 rounded-lg shadow-lg flex flex-col items-center transform transition-all duration-300 hover:scale-105 hover:shadow-xl">
+      <div className="relative w-40 h-56 overflow-hidden rounded-lg border border-gray-700">
+        {content.image ? (
+          <img
+            src={content.image}
+            alt={content.title}
+            className="w-full h-full object-cover transition-transform duration-300 hover:scale-110"
+          />
+        ) : (
+          <div className="w-full h-full bg-gray-700 flex items-center justify-center">
+            <span className="text-gray-400 text-4xl">🎬</span>
+          </div>
+        )}
+      </div>
+      <h2 className="text-lg mt-3 text-center font-semibold line-clamp-2">{content.title}</h2>
+      <p className="text-sm text-gray-400 mt-1">{content.year}</p>
+      <button
+        onClick={() => onAction(content)}
+        className={`mt-3 px-4 py-2 text-sm rounded-lg font-medium transition-all duration-300 ${
+          isWatched
+            ? "bg-red-600 hover:bg-red-700 text-white flex items-center gap-2"
+            : "bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
+        }`}
+      >
+        {isWatched ? "Remove" : "Add to Watched"}
+      </button>
+    </div>
+  );
 
   const renderWatchedContent = () => {
     return watchedContent.map((item) => (
@@ -190,6 +218,54 @@ const ContentDiary = () => {
       />
     ));
   };
+
+  const renderSearchSection = () => (
+    <>
+      <div className="flex flex-col md:flex-row gap-4 mb-8">
+        <div className="flex-1 flex space-x-2">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && fetchContent()}
+              placeholder={`Search ${contentType}s...`}
+              className="w-full p-3 pl-10 rounded-lg bg-gray-800 border border-gray-600 text-white transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <span className="absolute left-3 top-3.5 text-gray-400">🔍</span>
+          </div>
+          <button
+            onClick={fetchContent}
+            disabled={loading}
+            className="px-6 py-3 bg-blue-600 rounded-lg text-white hover:bg-blue-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {loading ? "Loading..." : "Search"}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {loading ? (
+          <div className="col-span-full text-center py-12">
+            <div className="text-gray-400">Searching...</div>
+          </div>
+        ) : content.length === 0 ? (
+          <div className="col-span-full text-center text-gray-400 py-12">
+            {search.trim() ? `No ${contentType}s found.` : `Start searching for ${contentType}s!`}
+          </div>
+        ) : (
+          content.map((item) => (
+            <ContentCard
+              key={item.id}
+              content={item}
+              isWatched={watchedContent.some((m) => m.id === item.id)}
+              onAction={handleAddToWatched}
+            />
+          ))
+        )}
+      </div>
+    </>
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white flex flex-col items-center p-6">
@@ -208,6 +284,8 @@ const ContentDiary = () => {
               onClick={() => {
                 setContentType(type);
                 setActiveSection("search");
+                setContent([]); // Clear previous search results
+                setSearch(""); // Clear search input
               }}
               className={`px-4 py-2 rounded-lg capitalize ${
                 contentType === type 
@@ -222,6 +300,7 @@ const ContentDiary = () => {
             onClick={() => {
               setActiveSection("watchlist");
               setContent([]); // Clear search results when switching to watchlist
+              setSearch(""); // Clear search input
             }}
             className={`px-4 py-2 rounded-lg ${
               activeSection === "watchlist"
@@ -232,7 +311,11 @@ const ContentDiary = () => {
             Watchlist
           </button>
           <button
-            onClick={() => setActiveSection("stash")}
+            onClick={() => {
+              setActiveSection("stash");
+              setContent([]); // Clear search results when switching to stash
+              setSearch(""); // Clear search input
+            }}
             className={`px-4 py-2 rounded-lg ${
               activeSection === "stash"
                 ? "bg-purple-600 text-white"
@@ -244,9 +327,7 @@ const ContentDiary = () => {
         </div>
 
         {activeSection === "search" ? (
-          <>
-            {/* Existing search section code remains the same */}
-          </>
+          renderSearchSection()
         ) : activeSection === "watchlist" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {watchedContent.length === 0 ? (
@@ -258,13 +339,43 @@ const ContentDiary = () => {
             )}
           </div>
         ) : (
-          // Stash section (existing code)
           <div className="space-y-6">
-            {/* Existing stash form and items code remains the same */}
+            {/* Existing stash form and items code */}
+            <form 
+              onSubmit={handleStashFormSubmit} 
+              className="bg-gray-800 p-6 rounded-lg space-y-4"
+            >
+              {/* Existing stash form content */}
+            </form>
+
+            <div className="space-y-4">
+              <h2 className="text-2xl font-bold text-purple-400">
+                My Stash ({stashItems.length})
+              </h2>
+              {stashItems.length === 0 ? (
+                <div className="text-center text-gray-400 py-12">
+                  Your stash is empty. Start adding some items!
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {renderStashItems()}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Error handling remains the same */}
+        {error && (
+          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-900/80 border border-red-500 text-red-200 px-6 py-3 rounded-lg z-50">
+            {error}
+            <button 
+              onClick={() => setError("")}
+              className="ml-4 text-red-300 hover:text-red-100"
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
