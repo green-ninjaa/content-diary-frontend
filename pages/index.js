@@ -388,4 +388,110 @@ const ContentDiary = () => {
                 <select
                   value={stashForm.type}
                   onChange={(e) => setStashForm({...stashForm, type: e.target.value})}
-                  className="
+                  className="w-full p-2 bg-gray-700 rounded-lg border border-gray-600 text-white"
+                >
+                  <option value="link">Link</option>
+                  <option value="image">Image URL</option>
+                  <option value="file">File Upload</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={stashForm.title}
+                  onChange={(e) => setStashForm({...stashForm, title: e.target.value})}
+                  required
+                  className="w-full p-2 bg-gray-700 rounded-lg border border-gray-600 text-white"
+                  placeholder="Enter a title for your stash item"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Description (Optional)
+                </label>
+                <textarea
+                  value={stashForm.description}
+                  onChange={(e) => setStashForm({...stashForm, description: e.target.value})}
+                  className="w-full p-2 bg-gray-700 rounded-lg border border-gray-600 text-white"
+                  placeholder="Add a description"
+                  rows="3"
+                />
+              </div>
+
+              {stashForm.type !== 'file' ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    {stashForm.type === 'link' ? 'URL' : 'Image URL'}
+                  </label>
+                  <input
+                    type="url"
+                    value={stashForm.url}
+                    onChange={(e) => setStashForm({...stashForm, url: e.target.value})}
+                    required
+                    className="w-full p-2 bg-gray-700 rounded-lg border border-gray-600 text-white"
+                    placeholder={stashForm.type === 'link' 
+                      ? "https://example.com" 
+                      : "https://example.com/image.jpg"}
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    File Upload
+                  </label>
+                  <input
+                    type="file"
+                    onChange={(e) => setStashForm({...stashForm, file: e.target.files[0]})}
+                    required
+                    className="w-full p-2 bg-gray-700 rounded-lg border border-gray-600 text-white"
+                  />
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Add to Stash
+              </button>
+            </form>
+
+            <div className="space-y-4">
+              <h2 className="text-2xl font-bold text-purple-400">
+                My Stash ({stashItems.length})
+              </h2>
+              {stashItems.length === 0 ? (
+                <div className="text-center text-gray-400 py-12">
+                  Your stash is empty. Start adding some items!
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {renderStashItems()}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-900/80 border border-red-500 text-red-200 px-6 py-3 rounded-lg z-50">
+            {error}
+            <button 
+              onClick={() => setError("")}
+              className="ml-4 text-red-300 hover:text-red-100"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ContentDiary;
